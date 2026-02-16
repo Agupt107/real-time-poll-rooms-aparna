@@ -5,19 +5,6 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "../prisma";
 import { hashIp } from "../utils/hash";
 
-// require() used so ts-node resolves the package (ESM exports can fail with moduleResolution: "node")
-const rateLimit = require("express-rate-limit") as (options: Record<string, unknown>) => express.RequestHandler;
-
-// Rate limiting: prevents rapid repeated voting attempts (e.g. scripts hammering the vote endpoint).
-// Limitation: applies per IP; does not stop a single extra vote from a different IP or after clearing storage.
-const voteRateLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: 5,
-  message: { error: "Too many vote attempts. Try again later." },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
-
 type PollWithOptions = Prisma.PollGetPayload<{ include: { options: true } }>;
 
 function paramString(
@@ -68,6 +55,7 @@ export function createPollRouter(io: SocketIOServer): Router {
 
       res.status(201).json({ ...poll, shareableLink });
     } catch (err) {
+      console.error("Create poll error:", err);
       res.status(500).json({ error: "Failed to create poll" });
     }
   });
@@ -87,18 +75,12 @@ export function createPollRouter(io: SocketIOServer): Router {
 
       res.json(poll);
     } catch (err) {
+      console.error("Get poll error:", err);
       res.status(500).json({ error: "Failed to fetch poll" });
     }
   });
 
-  // One vote per browser: fingerprint (voterId) is required; DB has @@unique([pollId, fingerprint]).
-  // Prevents: duplicate votes from the same browser/device (same localStorage).
-  // Limitation: user can clear localStorage or use incognito/another device to vote again.
-  //
-  // One vote per IP: we store hashedIp; DB has @@unique([pollId, hashedIp]).
-  // Prevents: multiple votes from the same IP (e.g. one network).
-  // Limitation: VPN/proxy changes IP; NAT can make many users share one IP (only one vote per poll for that IP).
-  router.post("/:id/vote", voteRateLimiter, async (req: Request, res: Response): Promise<void> => {
+  router.post("/:id/vote", async (req: Request, res: Response): Promise<void> => {
     try {
       const pollId = paramString(req.params, "id");
       if (!pollId) {
@@ -151,7 +133,6 @@ export function createPollRouter(io: SocketIOServer): Router {
         include: { options: true },
       });
 
-      // Emit to room so only users viewing this poll get updates (real-time, no polling).
       io.to(`poll_${pollId}`).emit("voteUpdate", updatedPoll);
       res.json(updatedPoll);
     } catch (err) {
@@ -160,6 +141,7 @@ export function createPollRouter(io: SocketIOServer): Router {
         res.status(409).json({ error: "Already voted" });
         return;
       }
+      console.error("Vote error:", err);
       res.status(500).json({ error: "Failed to record vote" });
     }
   });
