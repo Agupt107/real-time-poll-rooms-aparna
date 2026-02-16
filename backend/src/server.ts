@@ -37,7 +37,7 @@ io.on("connection", (socket) => {
 app.use(cors({ origin: corsOrigin }));
 app.use(express.json());
 
-app.use("/api/polls", createPollRouter(io));
+app.use("/api/poll", createPollRouter(io));
 
 app.use((_req: Request, res: Response) => {
   res.status(404).json({ error: "Not found" });

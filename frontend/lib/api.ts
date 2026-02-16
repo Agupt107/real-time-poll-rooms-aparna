@@ -37,12 +37,12 @@ export interface CreatePollResponse extends Poll {
 }
 
 export async function createPoll(body: CreatePollBody): Promise<CreatePollResponse> {
-  const { data } = await api.post<CreatePollResponse>("/api/polls", body);
+  const { data } = await api.post<CreatePollResponse>("/api/poll", body);
   return data;
 }
 
 export async function getPoll(id: string): Promise<Poll> {
-  const { data } = await api.get<Poll>(`/api/polls/${id}`);
+  const { data } = await api.get<Poll>(`/api/poll/${id}`);
   return data;
 }
 
@@ -50,7 +50,7 @@ export async function vote(
   pollId: string,
   body: VoteBody
 ): Promise<Poll> {
-  const { data } = await api.post<Poll>(`/api/polls/${pollId}/vote`, body);
+  const { data } = await api.post<Poll>(`/api/poll/${pollId}/vote`, body);
   return data;
 }
 
